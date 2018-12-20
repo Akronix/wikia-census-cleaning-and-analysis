@@ -1,0 +1,195 @@
+---
+title: "Wikia census: cleaning and analysis"
+author: "Abel Serrano Juste"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+bibliography: bibliography.bib
+output:
+  html_document:
+    highlight: default
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+  html_notebook: default
+  pdf_document:
+    fig_caption: yes
+    latex_engine: xelatex
+    toc: yes
+lang: es
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r carga librerías, include=FALSE, echo=FALSE}
+require("plyr") # para ordenar vectores
+```
+
+
+# Introducción
+En esta práctica, vamos a realizar un proyecto analítico de ciencia de datos sobre el ecosistema de las wikis.
+
+Según la [definición de Wikipedia para wiki](https://es.wikipedia.org/wiki/Wiki):
+
+> El término wiki (proviene del hawaiano wiki, «rápido») alude al nombre que recibe una comunidad virtual, cuyas páginas son editadas directamente desde el navegador, donde los mismos usuarios crean, modifican, corrigen o eliminan contenidos que, generalmente, comparten. 
+
+Las wikis son un interesante objeto de estudio puesto que permiten investigar la colaboración masiva de usuarios online para crear un contenido común.
+
+Utilizaremos los términos usuario y editor indistantemente, puesto que en el contexto de una wiki se pueden entender como sinónimos.
+
+# Problema a resolver
+
+Analizar la actividad y diversidad de las wikis alojadas en [el servicio Wikia](https://es.wikipedia.org/wiki/Fandom_(sitio_web)).
+
+# Fuentes de datos
+
+Para esta práctica, vamos a usar dos datasets: **Wikia census** y **Wikia page views**; ambos disponibles en [mi cuenta de kaggle](https://www.kaggle.com/abeserra/datasets).
+
+1. [El censo de Wikia](https://www.kaggle.com/abeserra/wikia-census/#20181019-wikia_stats_users_birthdate.csv). Se trata de un dataset de un conjunto de 300k wikis que corresponde a todas las wikis alojadas en Wikia. Este dataset contiene datos descriptivos de cada wiki como: número de páginas, número de usuarios, número de ediciones, etc. Los métodos de extracción y la información proporcionada en este censo está explicada en el paper: [A Wikia census: motives, tools and insights](http://www.opensym.org/wp-content/uploads/2018/07/OpenSym2018_paper_27-1.pdf).
+
+2. [Wikia page views](https://www.kaggle.com/abeserra/wikia-page-views). Se trata de una captura de datos, realizada mediante web scrapping de todas las wikis de Wikia, que contiene el número de visitas para cada una de las wikis de Wikia en las últimas cuatro semanas. Este dataset se obtuvo para la práctica anterior de esta misma asignatura y el código fuente para su obtención está en el este repositorio de Github: https://github.com/Akronix/scrap_wikia_page_views.
+
+
+# Descripción del Dataset
+
+Como hemos explicado previamente, vamos a usar dos datasets: el censo de wikia y los números de páginas visitadas.
+
+## Wikia census dataset
+El primer paso consistirá en cargar los datos:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Cargamos el juego de datos
+wikis<-read.csv("data/20181019-wikia_stats_users_birthdate.csv",header=T,sep=",")
+```
+
+A continuación, haremos una breve descripción de los datos, ya que nos interesa tener una idea general de los datos que disponemos. Para ello, primero calcularemos las dimensiones de nuestra base de datos y mostraremos una muestra de los datos para interpretar qué tipos de atributos tenemos.
+
+```{r}
+dim(wikis)
+```
+
+Disponemos de datos de 277795 wikis (filas) con 32 atributos sobre cada uno de ellos (columnas).
+
+```{r}
+head(wikis)
+```
+
+```{r}
+str(wikis)
+```
+
+En base a la muestra, al conocimiento sobre el campo en el que estamos trabajando (wikis) y a la descripción proporcionada en el paper *"A Wikia census: motives, tools and insights"*, deducimos los siguientes atributos:
+
+- url: url de la wiki
+- creation_date: fecha de creación de la wiki en un timestamp
+- domain: dominio web de la wiki
+- founding_user_id: user id del fundador de la wiki
+- headline: ??
+- hub: Categoría de la wiki dentro de las definidas por Wikia.
+- id: id de la wiki
+- lang y language: idioma de la wiki
+- name: Nombre propio de la wiki
+- stats.activeUsers: número de usuarios activos en el último mes. Los usuarios activos son los usuarios que han hecho al menos una acción (una edición) en los últimos 30 días.
+- stats.admins: número de usuarios administradores.
+- stats.articles: número de artículos de la wiki.
+- stats.discussions: ???
+- stats.edits: número de ediciones en la wiki.
+- stats.images: número de imágenes subidas.
+- stats.pages: número de páginas de la wiki.
+- stats.users: número de usuarios registrados en toda Wikia (potencialmente, cualquier podría user usuario de cada wiki porque los usuarios se registran a nivel de toda Wikia).
+- stats.videos: número de videos subidos.
+- title: título de la wiki
+- topic: Temática de la wiki definida por el administrador de la wiki.
+- wam_score: Puntuación que le da Wikia a las wikis: http://community.wikia.com/wiki/WAM/FAQ
+- stats.nonarticles: número de páginas no artículos en la wiki.
+- users_{1,5,10,20,50,100}: Número de usuarios con al menos {una, cinco, diez, veinte, cincuenta, cien} edición(es).
+- bots: Número de usuarios de tipo bot (no humanos)
+- birthdate: fecha de creación de la wiki en formato natural
+- datetime.birthDate: fecha de creación de la wiki en formato datetime de Python
+
+Para terminar con el estudio previo de los datos, pedimos a R que nos muestre un resumen de cómo están distribuidos los valores de los atributos:
+```{r}
+summary(wikis)
+```
+
+Los campos url y domain son identificadores de la wiki y deberían ser únicos. Aunque tenemos un repetido en el dominio cliff-side.wikia.com que trataremos más adelante.
+
+Ahora podemos deducir que headline se refiere a una especie de subtítulo de la wiki. En cualquier caso, se trata de un campo de texto informativo para los usuarios de la wiki, pero que a nosotros no nos interesa.
+
+Tenemos muchísimas wikis sin videos y también muchas sin imágenes.
+
+## Wikia page views dataset
+Ahora procedemos a cargar los datos de visitas:
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Cargamos el juego de datos
+wikis_pgv<-read.csv("data/20181113_wikia-page-views.csv",header=T,sep=",")
+head(wikis_pgv)
+```
+
+Mostramos información descriptiva de estos datos:
+```{r}
+str(wikis_pgv)
+summary(wikis_pgv)
+```
+
+Observamos que hay una wiki duplicada: `http://pl.6bp-6-batalion-pancerny.wikia.com/`.
+También observamos que la mayoría de la wikis (más de la mitad) no han tenido ni una sola visita a sus páginas en las últimas cuatro semanas. Es decir, podríamos considerar que estas wikis están muertas, puesto que ni siquiera usuarios de internet externos a la comunidad las visitan.
+En el otro extremo tenemos también otras wikis muy populares y así vemos como las medias que obtenemos de tanto páginas visitas como de visitas son mucho mayores que cero. Pero estas wikis que acumulan muchas visitas son escasas y no aparecen hasta más tarde del tercer cuartil de wikis.
+
+Mostramos top 10 wikis con mayor número de visitas:
+```{r}
+head(wikis_pgv[with(wikis_pgv, order(desc(wikis_pgv$total_views))), ], n = 10)
+```
+Y top 10 wikis con mayor número de páginas visitadas:
+```{r}
+head(wikis_pgv[with(wikis_pgv, order(desc(wikis_pgv$visited_pages))), ], n = 10)
+```
+
+
+# Limpieza
+
+Vamos a hacer limpieza de los datos que muestran valores raros o que no deberían estar:
+Empezamos por tratar que el número de imágenes sea negativo:
+
+Fijaremos a 0 cuando stats.images sea inferior a 0.
+```{r}
+wikis$stats.images[wikis$stats.images < 0] = 0
+```
+
+Fijaremos a 0 cuando stas.activeUsers sea inferior a 0. (Significa que no tenemos usuarios activos en esa wiki, pero no tiene sentido que tengamos valores menores que 0):
+```{r}
+wikis$stats.activeUsers[wikis$stats.activeUsers < 0] = 0
+```
+
+
+Eliminamos wikis con stats.users o stats.nonarticles o stats.pages menores que cero, puesto que más bien representan que la wiki no tiene datos válidos (una wiki normal al menos debe tener un usuario registrado o una página):
+```{r}
+invalid_wikis = wikis$stats.users < 0 | wikis$stats.pages < 0 | wikis$stats.nonarticles < 0
+dim(wikis[invalid_wikis,]) # number of invalid wikis to delete
+wikis = wikis[-invalid_wikis,]
+dim(wikis)
+```
+
+Después, vemos qué pasa con los duplicados por dominio:
+```{r}
+wikis[duplicated(wikis$domain),]
+#wikis[domain == "cliff-side.wikia.com", ] # Solo hay este dominio duplicado
+# el dominio cliff-side.wikia.com está repetido. Eliminamos el último:
+wikis = wikis[-duplicated(wikis$domain),]
+dim(wikis)
+```
+
+Eliminamos también el duplicado que hemos visto para los datos de las visitas:
+```{r}
+wikis_pgv = wikis_pgv[!duplicated(wikis_pgv$url),]
+summary(wikis_pgv)
+```
+
+# Transformación
+
+# Análisis
+
+# Visualización 
+
+# Conclusiones
