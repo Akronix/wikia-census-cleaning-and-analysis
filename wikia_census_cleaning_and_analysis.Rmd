@@ -13,7 +13,6 @@ output:
     theme: cosmo
     toc: yes
     toc_depth: 2
-  html_notebook: default
 lang: es
 ---
 
@@ -187,11 +186,55 @@ summary(wikis_pgv)
 ```
 
 # Transformación
+En lugar de tener la fecha de creación del censo con formato fecha, que es un formato poco comparable y clasificable en intervalos, vamos a convertirlo a una nueva variable `age` que será la edad de la wiki en días:
 
-# Análisis
+```{r}
+wikis$datetime.birthDate = as.POSIXct(wikis$datetime.birthDate)
+#str(wikis$datetime.birthDate)
+wikis$age = as.integer(Sys.time() - wikis$datetime.birthDate)
+summary(wikis$age)
+```
 
-# Visualización 
+El valor máximo de 736808 corresponde al año 1 d.C., lo cual es imposible. Miramos cuántos valores de estos anómalos hay para age:
+```{r}
+wikis[wikis$age > 365 * 22 , c('birthDate', 'datetime.birthDate', 'age')] # wikis con más de 22 años
+```
+Observamos que hay un error en la wiki con url: http://jrmime.wikia.com. La fecha en `birthDate` es incorrecta (año 1), mientras que la fecha de creación en realidad es 2013-03-11.
 
-# Conclusiones
+Lo arreglamos:
+```{r}
+aux = wikis[wikis$age > 365 * 22 ,]
+aux$age = as.integer(Sys.time() - as.POSIXct(aux$creation_date))
+wikis[wikis$age > 365 * 22 ,] = aux
+# Comprobamos de nuevo si hay algún otro caso raro:
+wikis[wikis$age > 365 * 22 ,] # wikis con más de 22 años
+summary(wikis$age)
+```
+
+
+# Integración
+Ahora vamos a unir los dos datasets de los cuales disponemos: Wikia Census y Wikia page views. Es lo podemos hacer añadiendo los datos de visitas al dataframe `wikis` que ya tenemos. Para ello debemos juntar ambos dataframes usando como columna identificadora común la columna `url`.
+
+```{r}
+wikis_all = merge(wikis, wikis_pgv, by="url")
+dim(wikis_all)
+summary(wikis_all)
+```
+
+
+<!-- # Análisis -->
+
+<!-- # Visualización  -->
+
+<!-- # Conclusiones -->
+
+# Resultados
+Finalmente, vamos a producir un fichero con los datos ya limpiados, transformados e integrados: 
+```{r}
+write.csv(wikis_all, "output_data/20181019-wikia_census_and_page_views-clean.csv")
+```
+
+
+
 
 # Referencias

@@ -123,7 +123,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Wikia census: cleaning and analysis</h1>
 <h4 class="author"><em>Abel Serrano Juste</em></h4>
-<h4 class="date"><em>20 de diciembre, 2018</em></h4>
+<h4 class="date"><em>23 de diciembre, 2018</em></h4>
 
 </div>
 
@@ -138,9 +138,9 @@ $(document).ready(function () {
 </ul></li>
 <li><a href="#limpieza">Limpieza</a></li>
 <li><a href="#transformacion">Transformación</a></li>
-<li><a href="#analisis">Análisis</a></li>
-<li><a href="#visualizacion">Visualización</a></li>
-<li><a href="#conclusiones">Conclusiones</a></li>
+<li><a href="#integracion">Integración</a></li>
+<li><a href="#resultados">Resultados</a></li>
+<li><a href="#referencias">Referencias</a></li>
 </ul>
 </div>
 
@@ -162,7 +162,7 @@ $(document).ready(function () {
 <h1>Fuentes de datos</h1>
 <p>Para esta práctica, vamos a usar dos datasets: <strong>Wikia census</strong> y <strong>Wikia page views</strong>; ambos disponibles en <a href="https://www.kaggle.com/abeserra/datasets">mi cuenta de kaggle</a>.</p>
 <ol style="list-style-type: decimal">
-<li><p><a href="https://www.kaggle.com/abeserra/wikia-census/#20181019-wikia_stats_users_birthdate.csv">El censo de Wikia</a>. Se trata de un dataset de un conjunto de 300k wikis que corresponde a todas las wikis alojadas en Wikia. Este dataset contiene datos descriptivos de cada wiki como: número de páginas, número de usuarios, número de ediciones, etc. Los métodos de extracción y la información proporcionada en este censo está explicada en el paper: <a href="http://www.opensym.org/wp-content/uploads/2018/07/OpenSym2018_paper_27-1.pdf">A Wikia census: motives, tools and insights</a>.</p></li>
+<li><p><a href="https://www.kaggle.com/abeserra/wikia-census/#20181019-wikia_stats_users_birthdate.csv">El censo de Wikia</a>. Se trata de un dataset de un conjunto de 300k wikis que corresponde a todas las wikis alojadas en Wikia. Este dataset contiene datos descriptivos de cada wiki como: número de páginas, número de usuarios, número de ediciones, etc. Los métodos de extracción y la información proporcionada en este censo está explicada en el paper: <a href="http://www.opensym.org/wp-content/uploads/2018/07/OpenSym2018_paper_27-1.pdf">A Wikia census: motives, tools and insights</a> <span class="citation">(Jimenez-Diaz, Serrano, y Arroyo 2018)</span>.</p></li>
 <li><p><a href="https://www.kaggle.com/abeserra/wikia-page-views">Wikia page views</a>. Se trata de una captura de datos, realizada mediante web scrapping de todas las wikis de Wikia, que contiene el número de visitas para cada una de las wikis de Wikia en las últimas cuatro semanas. Este dataset se obtuvo para la práctica anterior de esta misma asignatura y el código fuente para su obtención está en el este repositorio de Github: <a href="https://github.com/Akronix/scrap_wikia_page_views" class="uri">https://github.com/Akronix/scrap_wikia_page_views</a>.</p></li>
 </ol>
 </div>
@@ -536,15 +536,167 @@ summary(wikis_pgv)</code></pre>
 </div>
 <div id="transformacion" class="section level1">
 <h1>Transformación</h1>
+<p>En lugar de tener la fecha de creación del censo con formato fecha, que es un formato poco comparable y clasificable en intervalos, vamos a convertirlo a una nueva variable <code>age</code> que será la edad de la wiki en días:</p>
+<pre class="r"><code>wikis$datetime.birthDate = as.POSIXct(wikis$datetime.birthDate)
+#str(wikis$datetime.birthDate)
+wikis$age = as.integer(Sys.time() - wikis$datetime.birthDate)
+summary(wikis$age)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##      96     321    1176    1361    2185  736841</code></pre>
+<p>El valor máximo de 736808 corresponde al año 1 d.C., lo cual es imposible. Miramos cuántos valores de estos anómalos hay para age:</p>
+<pre class="r"><code>wikis[wikis$age &gt; 365 * 22 , c('birthDate', 'datetime.birthDate', 'age')] # wikis con más de 22 años</code></pre>
+<pre><code>##                   birthDate datetime.birthDate    age
+## 201614 20:25, July 28, 0001   1-07-28 20:25:00 736841</code></pre>
+<p>Observamos que hay un error en la wiki con url: <a href="http://jrmime.wikia.com" class="uri">http://jrmime.wikia.com</a>. La fecha en <code>birthDate</code> es incorrecta (año 1), mientras que la fecha de creación en realidad es 2013-03-11.</p>
+<p>Lo arreglamos:</p>
+<pre class="r"><code>aux = wikis[wikis$age &gt; 365 * 22 ,]
+aux$age = as.integer(Sys.time() - as.POSIXct(aux$creation_date))
+wikis[wikis$age &gt; 365 * 22 ,] = aux
+# Comprobamos de nuevo si hay algún otro caso raro:
+wikis[wikis$age &gt; 365 * 22 ,] # wikis con más de 22 años</code></pre>
+<pre><code>##  [1] url                creation_date      domain            
+##  [4] founding_user_id   headline           hub               
+##  [7] id                 lang               language          
+## [10] name               stats.activeUsers  stats.admins      
+## [13] stats.articles     stats.discussions  stats.edits       
+## [16] stats.images       stats.pages        stats.users       
+## [19] stats.videos       title              topic             
+## [22] wam_score          stats.nonarticles  users_1           
+## [25] users_5            users_10           users_20          
+## [28] users_50           users_100          bots              
+## [31] birthDate          datetime.birthDate age               
+## &lt;0 rows&gt; (or 0-length row.names)</code></pre>
+<pre class="r"><code>summary(wikis$age)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##      96     321    1176    1358    2185    7507</code></pre>
 </div>
-<div id="analisis" class="section level1">
-<h1>Análisis</h1>
+<div id="integracion" class="section level1">
+<h1>Integración</h1>
+<p>Ahora vamos a unir los dos datasets de los cuales disponemos: Wikia Census y Wikia page views. Es lo podemos hacer añadiendo los datos de visitas al dataframe <code>wikis</code> que ya tenemos. Para ello debemos juntar ambos dataframes usando como columna identificadora común la columna <code>url</code>.</p>
+<pre class="r"><code>wikis_all = merge(wikis, wikis_pgv, by=&quot;url&quot;)
+dim(wikis_all)</code></pre>
+<pre><code>## [1] 266408     35</code></pre>
+<pre class="r"><code>summary(wikis_all)</code></pre>
+<pre><code>##                                 url                     creation_date   
+##  http://0002oifos.wikia.com       :     1   2006-03-16 13:42:45:   370  
+##  http://001-game-creator.wikia.com:     1   2004-11-11 23:33:14:    77  
+##  http://001littlebighelp.wikia.com:     1   2017-10-16 21:02:01:    12  
+##  http://007fanon.wikia.com        :     1   2006-10-28 11:16:22:    11  
+##  http://007goldeneye.wikia.com    :     1   2017-10-02 21:37:50:     8  
+##  http://007-james-bond.wikia.com  :     1   2018-02-08 13:53:15:     7  
+##  (Other)                          :266402   (Other)            :265923  
+##                         domain       founding_user_id  
+##  cliff-side.wikia.com      :     2   Min.   :       0  
+##  0002oifos.wikia.com       :     1   1st Qu.: 4893531  
+##  001-game-creator.wikia.com:     1   Median :25311196  
+##  001littlebighelp.wikia.com:     1   Mean   :19946785  
+##  007fanon.wikia.com        :     1   3rd Qu.:32232648  
+##  007goldeneye.wikia.com    :     1   Max.   :36902116  
+##  (Other)                   :266401   NA's   :35        
+##                                     headline             hub        
+##                                         :258992   Games    :100378  
+##  Alice Wiki                             :     2   Lifestyle: 62942  
+##  Assassin's Creed Wiki                  :     2   TV       : 42839  
+##  Bakugan Wiki                           :     2   Books    : 21363  
+##  Bienvenidos a PokéMewtwo y PokéFantasy.:     2   Comics   : 13757  
+##  BioShock Wiki                          :     2   Movies   : 13436  
+##  (Other)                                :  7406   (Other)  : 11693  
+##        id               lang           language     
+##  Min.   :      1   en     :191596   en     :191596  
+##  1st Qu.: 643464   es     : 28618   es     : 28618  
+##  Median :1240829   ru     : 12298   ru     : 12298  
+##  Mean   :1121512   de     :  8741   de     :  8741  
+##  3rd Qu.:1668302   pl     :  7318   pl     :  7318  
+##  Max.   :1807291   fr     :  6558   fr     :  6558  
+##                    (Other): 11279   (Other): 11279  
+##                   name        stats.activeUsers   stats.admins    
+##  Test Wiki          :    60   Min.   :   0.000   Min.   :  0.000  
+##  Naruto Wiki        :    53   1st Qu.:   0.000   1st Qu.:  1.000  
+##  Harry Potter Wiki  :    46   Median :   0.000   Median :  1.000  
+##  Pokemon Wiki       :    46   Mean   :   0.813   Mean   :  1.483  
+##  Minecraft Wiki     :    42   3rd Qu.:   0.000   3rd Qu.:  1.000  
+##  Final Frontier Wiki:    39   Max.   :7311.000   Max.   :248.000  
+##  (Other)            :266122                                       
+##  stats.articles      stats.discussions   stats.edits      
+##  Min.   :      0.0   Min.   :    0.00   Min.   :       0  
+##  1st Qu.:      5.0   1st Qu.:    0.00   1st Qu.:     121  
+##  Median :     10.0   Median :    0.00   Median :     250  
+##  Mean   :    104.6   Mean   :    2.56   Mean   :    2482  
+##  3rd Qu.:     30.0   3rd Qu.:    1.00   3rd Qu.:     478  
+##  Max.   :1145898.0   Max.   :77051.00   Max.   :23302062  
+##                      NA's   :51310                        
+##   stats.images       stats.pages       stats.users      
+##  Min.   :     0.0   Min.   :     -1   Min.   :      -1  
+##  1st Qu.:     2.0   1st Qu.:    103   1st Qu.:16129209  
+##  Median :    11.0   Median :    181   Median :16362464  
+##  Mean   :   190.1   Mean   :    949   Mean   :16221110  
+##  3rd Qu.:    41.0   3rd Qu.:    288   3rd Qu.:16543432  
+##  Max.   :784356.0   Max.   :7727191   Max.   :23922667  
+##                                                         
+##   stats.videos                      title                  topic      
+##  Min.   :    0.00   Test Wiki          :    60   Video Games  :52417  
+##  1st Qu.:    0.00   Naruto Wiki        :    53   Gaming       :35770  
+##  Median :    0.00   Harry Potter Wiki  :    46   Entertainment:28205  
+##  Mean   :    6.76   Pokemon Wiki       :    46   Creative     :25021  
+##  3rd Qu.:    0.00   Minecraft Wiki     :    42   Fanon        :22258  
+##  Max.   :51799.00   Final Frontier Wiki:    39   TV           :13509  
+##                     (Other)            :266122   (Other)      :89228  
+##    wam_score       stats.nonarticles    users_1         
+##  Min.   : 0.0000   Min.   :     -1   Min.   :     0.00  
+##  1st Qu.: 0.0000   1st Qu.:     96   1st Qu.:     4.00  
+##  Median : 0.0000   Median :    156   Median :     5.00  
+##  Mean   : 0.9481   Mean   :    844   Mean   :    25.09  
+##  3rd Qu.: 0.0000   3rd Qu.:    257   3rd Qu.:     9.00  
+##  Max.   :99.8342   Max.   :7725359   Max.   :127087.00  
+##                                                         
+##     users_5            users_10            users_20      
+##  Min.   :    0.00   Min.   :    0.000   Min.   :    0.0  
+##  1st Qu.:    1.00   1st Qu.:    1.000   1st Qu.:    0.0  
+##  Median :    2.00   Median :    1.000   Median :    1.0  
+##  Mean   :   10.44   Mean   :    6.975   Mean   :    4.6  
+##  3rd Qu.:    4.00   3rd Qu.:    3.000   3rd Qu.:    2.0  
+##  Max.   :32279.00   Max.   :18682.000   Max.   :15113.0  
+##                                                          
+##     users_50           users_100             bots       
+##  Min.   :    0.000   Min.   :   0.000   Min.   : 0.000  
+##  1st Qu.:    0.000   1st Qu.:   0.000   1st Qu.: 2.000  
+##  Median :    1.000   Median :   0.000   Median : 4.000  
+##  Mean   :    2.573   Mean   :   1.606   Mean   : 4.167  
+##  3rd Qu.:    1.000   3rd Qu.:   1.000   3rd Qu.: 5.000  
+##  Max.   :11067.000   Max.   :8521.000   Max.   :34.000  
+##                                                         
+##                      birthDate      datetime.birthDate           
+##  20:00, December 11, 2013 :   375   Min.   :1-07-28 20:25:00     
+##  09:37, September 25, 2006:   332   1st Qu.:2012-12-02 14:52:45  
+##  21:24, February 22, 2018 :   211   Median :2015-08-03 18:29:00  
+##  15:07, October 4, 2016   :   165   Mean   :2015-03-04 03:23:54  
+##  21:27 22 feb 2018        :    73   3rd Qu.:2017-12-27 03:25:15  
+##  22:19 29 mar 2017        :    67   Max.   :2018-09-17 19:34:00  
+##  (Other)                  :265185                                
+##       age       visited_pages      total_views      
+##  Min.   :  96   Min.   :   0.00   Min.   :       0  
+##  1st Qu.: 361   1st Qu.:   0.00   1st Qu.:       0  
+##  Median :1237   Median :   0.00   Median :       0  
+##  Mean   :1387   Mean   :  12.47   Mean   :    2959  
+##  3rd Qu.:2212   3rd Qu.:   2.00   3rd Qu.:      15  
+##  Max.   :7507   Max.   :1000.00   Max.   :20386167  
+## </code></pre>
+<!-- # Análisis -->
+<!-- # Visualización  -->
+<!-- # Conclusiones -->
 </div>
-<div id="visualizacion" class="section level1">
-<h1>Visualización</h1>
+<div id="resultados" class="section level1">
+<h1>Resultados</h1>
+<p>Finalmente, vamos a producir un fichero con los datos ya limpiados, transformados e integrados:</p>
+<pre class="r"><code>write.csv(wikis_all, &quot;output_data/20181019-wikia_census_and_page_views-clean.csv&quot;)</code></pre>
 </div>
-<div id="conclusiones" class="section level1">
-<h1>Conclusiones</h1>
+<div id="referencias" class="section level1 unnumbered">
+<h1>Referencias</h1>
+<div id="refs" class="references">
+<div id="ref-jimenez2018opensym">
+<p>Jimenez-Diaz, Guillermo, Abel Serrano, y Javier Arroyo. 2018. «A Wikia Census: Motives, Tools and Insights». En <em>Proceedings of the 14th International Symposium on Open Collaboration</em>, 2:1-2:6. OpenSym ’18. New York, NY, USA: ACM. doi:<a href="https://doi.org/10.1145/3233391.3233526">10.1145/3233391.3233526</a>.</p>
+</div>
+</div>
 </div>
 
 
