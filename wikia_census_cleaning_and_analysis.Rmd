@@ -4,15 +4,15 @@ author: "Abel Serrano Juste"
 date: '`r format(Sys.Date(),"%e de %B, %Y")`'
 bibliography: bibliography.bib
 output:
-  pdf_document:
-    fig_caption: yes
-    latex_engine: xelatex
-    toc: yes
   html_document:
     highlight: default
     theme: cosmo
     toc: yes
     toc_depth: 2
+  pdf_document:
+    fig_caption: yes
+    latex_engine: xelatex
+    toc: yes
 lang: es
 ---
 
@@ -23,6 +23,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r carga librerías, include=FALSE, echo=FALSE}
 require("plyr") # para ordenar vectores
+require("xtable") # para transfomar objetos R en tablas
 ```
 
 
@@ -265,19 +266,25 @@ A continuación, vamos a ver qué factores determinan que una wiki esté activa/
 RELEVANT_ATTRS = c("hub", "language", "stats.articles", "stats.admins", "stats.edits", "stats.pages", "wam_score", "stats.pages", "users_1", "users_5", "users_10", "users_20", "users_50", "users_100")
 formula <- as.formula(paste("active ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
 regmodel.1 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_all)
-anova(regmodel.1)
 summary(regmodel.1)
 ```
+Los atributos que influyen a la hora de determinar que la wiki esté activa o no son (sin ordenar por importancia): wam_score, hubOther, stats.edits, hubTV, hubGames, hubComics, hubLifestyle, hubMovies, stats.articles, stats.admins, stats.pages, users_1, users_5, users_100, users_50.
 
-Los atributos que más influyen a la hora de determinar que la wiki esté activa o no son (por orden de importancia): 
+hubMusic y users_20 influyen muy poco y ya están bien representados con las anteriores variables, así que consideraremos que no son relevantes para nuestro modelo.
 
+Ordenamos los atributos por importancia:
+
+```{r}
+idx <- order(coef(summary(regmodel.1))[,4])  # sort out the p-values
+out <- coef(summary(regmodel.1))[idx,]       # reorder coef, SE, etc. by increasing p
+xtable(out)
+```
 
 Repetimos el análisis pero ahora usando como indicador de actividad que la wiki haya tenido alguna visita en el último mes:
 
 ```{r}
 formula <- as.formula(paste("visited ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
 regmodel.2 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_all)
-anova(regmodel.2)
 summary(regmodel.2)
 ```
 
