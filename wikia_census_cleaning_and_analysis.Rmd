@@ -114,7 +114,8 @@ summary(wikis)
 
 Los campos url y domain son identificadores de la wiki y deberían ser únicos. Aunque tenemos un repetido en el dominio cliff-side.wikia.com que trataremos más adelante.
 
-Ahora podemos deducir que headline se refiere a una especie de subtítulo de la wiki. En cualquier caso, se trata de un campo de texto informativo para los usuarios de la wiki, pero que a nosotros no nos interesa.
+Ahora podemos deducir que `headline` se refiere a una especie de subtítulo de la wiki. En cualquier caso, se trata de un campo de texto informativo para los usuarios de la wiki, pero que a nosotros no nos interesa.
+El campo `stats.discussions` podría corresponderse con el número de páginas de discusión (o [talk pages](https://en.wikipedia.org/wiki/Help:Talk_pages)).
 
 Tenemos muchísimas wikis sin videos y también muchas sin imágenes.
 
@@ -122,7 +123,7 @@ Tenemos muchísimas wikis sin videos y también muchas sin imágenes.
 Ahora procedemos a cargar los datos de visitas:
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 # Cargamos el juego de datos
-wikis_pgv<-read.csv("data/20181113_wikia-page-views.csv",header=T,sep=",")
+wikis_pgv<-read.csv("data/20181113_wikia-page-views.csv", header=T, sep=",")
 head(wikis_pgv)
 ```
 
@@ -221,10 +222,80 @@ dim(wikis_all)
 summary(wikis_all)
 ```
 
+# Transformación
 
-<!-- # Análisis -->
+Definimos una wiki como inactiva cuando el número de usuarios activos en el último mes (atributo `stats.activeUsers`) es igual a cero. Esto nos resultará útil para el posterior paso de análisis.
 
-<!-- # Visualización  -->
+Para ello, creamos una nueva columna llamada `active` que será TRUE si stats.activeUsers > 0 o FALSE en caso contrario.
+
+```{r}
+wikis_all$active = wikis_all$stats.activeUsers > 0
+str(wikis_all$active)
+```
+
+Similarmente, creamos una columna `visited` que será TRUE si ha habido alguna visita en el último mes en la wiki, o FALSE en caso contrario.
+
+```{r}
+wikis_all$visited = wikis_all$total_views > 0
+str(wikis_all$visited)
+```
+
+# Análisis
+Un análisis que me resulta interesante es ver si hay correlación entre ciertas variables y la actividad/inactividad de las wikis.
+
+Primero, vamos a ver si hay correlacción lineal entre el número de usuarios activos y el número de visitas en el último mes:
+```{r}
+regmodel <- lm( stats.activeUsers ~ total_views + visited_pages, data = wikis_all)
+summary(regmodel)
+```
+
+Los resultados muestran que ambas variables: total_views y visited_pages son variables explicativas para determinar el número de usuarios activos.
+
+Y viceversa: ¿El número de visitas determina el número de usuarios activos?
+```{r}
+regmodel <- lm( total_views ~ stats.activeUsers, data = wikis_all)
+summary(regmodel)
+```
+
+Efectivamente, la variable usuarios activos también determina si la wiki recibe visitas o no, por lo que podemos pensar que la wiki esté activa porque hay editores colaborando es equivalente a que tenga interés / utilidad para el resto del mundo.
+
+A continuación, vamos a ver qué factores determinan que una wiki esté activa/inactiva. Usamos un modelo de regresión logística y seleccionamos un subconjunto de variables que nos resulten relevantes para este análisis:
+
+```{r}
+RELEVANT_ATTRS = c("hub", "language", "stats.articles", "stats.admins", "stats.edits", "stats.pages", "wam_score", "stats.pages", "users_1", "users_5", "users_10", "users_20", "users_50", "users_100")
+formula <- as.formula(paste("active ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
+regmodel.1 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_all)
+anova(regmodel.1)
+summary(regmodel.1)
+```
+
+Los atributos que más influyen a la hora de determinar que la wiki esté activa o no son (por orden de importancia): 
+
+
+Repetimos el análisis pero ahora usando como indicador de actividad que la wiki haya tenido alguna visita en el último mes:
+
+```{r}
+formula <- as.formula(paste("visited ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
+regmodel.2 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_all)
+anova(regmodel.2)
+summary(regmodel.2)
+```
+
+
+# Visualización
+Mostramos cómo son las correlacciones que hemos realizado en el paso anterior:
+```{r}
+opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
+plot(regmodel.1, las = 1)      # Residuals, Fitted, ...
+par(opar)
+```
+
+
+```{r}
+opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
+plot(regmodel.2, las = 1)      # Residuals, Fitted, ...
+par(opar)
+```
 
 <!-- # Conclusiones -->
 
