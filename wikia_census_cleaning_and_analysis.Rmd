@@ -4,15 +4,15 @@ author: "Abel Serrano Juste"
 date: '`r format(Sys.Date(),"%e de %B, %Y")`'
 bibliography: bibliography.bib
 output:
+  pdf_document:
+    fig_caption: yes
+    latex_engine: xelatex
+    toc: yes
   html_document:
     highlight: default
     theme: cosmo
     toc: yes
     toc_depth: 2
-  pdf_document:
-    fig_caption: yes
-    latex_engine: xelatex
-    toc: yes
 lang: es
 ---
 
@@ -263,22 +263,36 @@ Efectivamente, la variable usuarios activos también determina si la wiki recibe
 A continuación, vamos a ver qué factores determinan que una wiki esté activa/inactiva. Usamos un modelo de regresión logística y seleccionamos un subconjunto de variables que nos resulten relevantes para este análisis:
 
 ```{r}
-RELEVANT_ATTRS = c("hub", "language", "stats.articles", "stats.admins", "stats.edits", "stats.pages", "wam_score", "stats.pages", "users_1", "users_5", "users_10", "users_20", "users_50", "users_100")
+RELEVANT_ATTRS = c("hub", "language", "stats.articles", "stats.admins", "stats.edits", "stats.pages", "stats.pages", "users_1", "users_5", "users_10", "users_20", "users_50", "users_100")
 formula <- as.formula(paste("active ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
 regmodel.1 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_all)
 summary(regmodel.1)
 ```
-Los atributos que influyen a la hora de determinar que la wiki esté activa o no son (sin ordenar por importancia): wam_score, hubOther, stats.edits, hubTV, hubGames, hubComics, hubLifestyle, hubMovies, stats.articles, stats.admins, stats.pages, users_1, users_5, users_100, users_50.
+Los atributos que influyen a la hora de determinar que la wiki esté activa o no, son (sin ordenar por importancia): hubComics, hubGames, hubLifestyle, hubMovies, hubOther, hubTV, stats.articles, stats.admins, stats.edits, stats.pages, users_1, users_5, users_50 y users_100.
 
-hubMusic y users_20 influyen muy poco y ya están bien representados con las anteriores variables, así que consideraremos que no son relevantes para nuestro modelo.
+hubMusic y users_20 influyen muy poco, así que consideraremos que no son relevantes para nuestro modelo.
+
+Observamos que el idioma en el que esté la wiki no es relevante para determinar que esté activa o no.
 
 Ordenamos los atributos por importancia:
 
 ```{r}
 idx <- order(coef(summary(regmodel.1))[,4])  # sort out the p-values
 out <- coef(summary(regmodel.1))[idx,]       # reorder coef, SE, etc. by increasing p
-xtable(out)
+print(xtable(out, caption = "Atributos relevantes para que una wiki esté activa", auto = TRUE))
 ```
+
+Respecto a los hubs, según este modelo "todos", aunque los hubs de Movies y Music lo son en menor nivel, son algo relevantes para determinar la actividad o no de la wiki. Esto es como no decir nada puesto que si cualquier hub es relevante y toda wiki pertenece a uno y a un solo hub, nunca podemos distinguir cuando es un hecho relevante y cuando no.
+
+Dicho todo lo anterior, observamos que los cinco atributos más importantes son:
+
+1. Que haya una base de usuarios registrados (users_1)
+2. Que la wiki tenga pocas páginas (el estimador es negativo, por tanto la relación es inversa)
+3. Que la wiki tenga usuarios asiduos y con experiencia (users_100)
+4. Que la wiki tenga pocos administradores (stats.admins, negativo)
+5. Que la wiki tenga páginas de contenido
+
+## Modelo de predicción para wikis visitadas
 
 Repetimos el análisis pero ahora usando como indicador de actividad que la wiki haya tenido alguna visita en el último mes:
 
@@ -288,6 +302,7 @@ regmodel.2 <- glm( formula = formula, family = binomial(link = 'logit'), data = 
 summary(regmodel.2)
 ```
 
+Los resultados son muy parecidos a los obtenidos anteriormente para la variable active. Las diferencias son: 1) para este modelo sí es realmente relevante que la wiki sea del hub Music y sin embargo, no es demasiado relevante que sea del hubGames; los valores de users_10 y users_20 cobran mayor importancia que en el modelo anterior, aunque siguen siendo menos importantes que los demás del modelo anterior (users_1, users_5, users_50 y users_100); la variable stats.pages no es demasiado relevante.
 
 # Visualización
 Mostramos cómo son las correlacciones que hemos realizado en el paso anterior:
@@ -307,12 +322,9 @@ par(opar)
 <!-- # Conclusiones -->
 
 # Resultados
-Finalmente, vamos a producir un fichero con los datos ya limpiados, transformados e integrados: 
+Finalmente, vamos a producir un fichero con los datos ya limpiados, transformados e integrados, y con los nuevos campos que hemos añadido durante todo el trabajo: 
 ```{r}
 write.csv(wikis_all, "output_data/20181019-wikia_census_and_page_views-clean.csv")
 ```
-
-
-
 
 # Referencias
