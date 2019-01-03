@@ -42,6 +42,8 @@ Utilizaremos los términos usuario y editor indistantemente, puesto que en el co
 
 Analizar la actividad y diversidad de las wikis alojadas en [el servicio Wikia](https://es.wikipedia.org/wiki/Fandom_(sitio_web)).
 
+Encontrar qué factores afectan a que una wiki esté activa o sea visitada.
+
 # Fuentes de datos
 
 Para esta práctica, vamos a usar dos datasets: **Wikia census** y **Wikia page views**; ambos disponibles en [mi cuenta de kaggle](https://www.kaggle.com/abeserra/datasets).
@@ -302,9 +304,58 @@ regmodel.2 <- glm( formula = formula, family = binomial(link = 'logit'), data = 
 summary(regmodel.2)
 ```
 
-Los resultados son muy parecidos a los obtenidos anteriormente para la variable active. Las diferencias son: 1) para este modelo sí es realmente relevante que la wiki sea del hub Music y sin embargo, no es demasiado relevante que sea del hubGames; los valores de users_10 y users_20 cobran mayor importancia que en el modelo anterior, aunque siguen siendo menos importantes que los demás del modelo anterior (users_1, users_5, users_50 y users_100); la variable stats.pages no es demasiado relevante.
+Los resultados son muy parecidos a los obtenidos anteriormente para la variable active. Las diferencias son: 1) los valores de users_10 y users_20 cobran mayor importancia que en el modelo anterior, aunque siguen siendo menos importantes que los demás que ya señalamos como relevantes (users_1, users_5, users_50 y users_100); 2) el atributo stats.pages no es demasiado relevante.
+
+Con estos resultados y sabiendo que una regresión lineal entre que una wiki esté visitada y esté activa, podemos confirmar que los factores para que una wiki se mantenga activa o para que sea visitada son los mismos, y son los que ya mencionamos en la tabla del apartado anterior.
 
 # Visualización
+
+Vamos a visualizar la correspondencia que acabamos de comentar entre visitas a las wikis y usuarios activos, mediante la llamada recta de regresión:
+```{r}
+plot(y = wikis_all$total_views, x = wikis_all$stats.activeUsers, type="p",  col = "blue", main="Recta de regresión usuarios activos ~ visitas", xlab = "Usuarios activos", ylab = "número de visitas", pch = 16)
+abline(regmodel)
+```
+
+Vemos que la correlación se cumple en general, aunque hay algún _outlayer_. En particular, tenemos una wiki con muchos usuarios activos (la que más usuarios activos tiene) pero con apenas visitas y otra wiki con muchas visitas y apenas usuarios activos (la que más visitas tiene).
+
+Vamos a ver de qué casos tan excepcionales se trata para entender el fenómeno mejor:
+
+```{r}
+# wiki con mayor número de visitas:
+outlayer1 = head(wikis_all[with(wikis_all, order(desc(wikis_all$total_views))), c("url", "total_views", "stats.activeUsers", "users_1", "stats.pages", "stats.articles")], n = 1)
+outlayer1
+```
+
+La wiki en cuestión se llama: "http://oldschoolrunescape.wikia.com", tiene 20386167 visitas en el último mes pero solamente 30 usuarios activos. Además tiene una gran cantidad de contenido y una sólida base de usuarios.
+
+[Investigando un poco](https://en.wikipedia.org/wiki/Old_School_RuneScape), se trata de un videojuego de tipo MMORPG.
+La razón para que sea un caso aislado posiblemente sea que el 30 de Octubre de 2018 se lanzó una nueva versión del videojuego para Android, justo entre medias desde que se tomaron los datos estadísticos en cuanto a cantidad de usuarios: 19 de Octubre (fichero `20181019-wikia_stats_users_birthdate.csv`); a cuando se tomaron os datos de visitas a las wikis: 13 de noviembre (fichero `20181113_wikia-page-views.csv`).
+
+Posiblemente, la misma causa sea válida para el caso aislado de una wiki con muchos usuarios activos y pocas visitas. Aún así, vamos a mirarla más de cerca:
+```{r}
+# wiki con mayor número de usuarios activos:
+outlayer2 = head(wikis_all[with(wikis_all, order(desc(wikis_all$stats.activeUsers))), c("url", "total_views", "stats.activeUsers", "users_1", "stats.pages", "stats.articles")], n = 1)
+outlayer2
+```
+
+"http://community.wikia.com" es una wiki especial, puesto que se trata de la wiki que tiene Wikia para publicar su propio contenido. Es una especia de _metawiki_ de Wikia. Efectivamente, lo más seguro es que pase igual que con el caso anterior y haya un desajuste entre algo que hizo que la gente estuviese visitando la wiki a principios de noviembre del pasado año, pero que sin embargo en octubre no se diese tal evento.
+
+# Repetición de análisis sin outlayers
+
+Repetimos el análisis realizado previamente sin los recién localizados outlayers para ver si podemos extraer las mismas conclusiones:
+
+```{r}
+wikis_no_outlayers = subset(wikis_all, url != outlayer1$url & url != outlayer2$url)
+dim(wikis_no_outlayers) # deberíamos haber pasado de 266408 wikis a 266406
+formula <- as.formula(paste("active ~ ", paste(RELEVANT_ATTRS, collapse = "+") ))
+regmodel.3 <- glm( formula = formula, family = binomial(link = 'logit'), data = wikis_no_outlayers)
+idx <- order(coef(summary(regmodel.3))[,4])  # sort out the p-values
+out <- coef(summary(regmodel.3))[idx,]       # reorder coef, SE, etc. by increasing p
+print(xtable(out, caption = "Atributos relevantes para que una wiki esté activa (sin outlayers)", auto = TRUE))
+
+```
+
+
 Mostramos cómo son las correlacciones que hemos realizado en el paso anterior:
 ```{r}
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
@@ -312,19 +363,27 @@ plot(regmodel.1, las = 1)      # Residuals, Fitted, ...
 par(opar)
 ```
 
-
 ```{r}
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
 plot(regmodel.2, las = 1)      # Residuals, Fitted, ...
 par(opar)
 ```
 
-<!-- # Conclusiones -->
+# Conclusiones
+Las wikis son un ecosistema de colaboración afianzado donde podemos estudiar fenómenos sociales de trabajo colaborativo interesantes. Además, disponemos de un dataset muy grande y variado de wikis con una gran cantidad de datos sobre el que podemos hacer un análisis extensivo y sacar conclusiones robustas.
 
-# Resultados
-Finalmente, vamos a producir un fichero con los datos ya limpiados, transformados e integrados, y con los nuevos campos que hemos añadido durante todo el trabajo: 
+Una de las características que podemos estudiar es qué factores son determinantes para que una comunidad online se mantenga activa, esto significa en el caso de las wikis, que haya usuarios activos editando la wiki. En nuestros análisis hemos descubierto que, para lograr dicho objetivo, los factores más relevantes son: 1) .....
+
+Además, también hemos corrobado que las visitas a una wiki (un indicador del interés o utilidad que tiene un recurso en internet) está correlacionada con el hecho de que tengan actividad (al menos un usuario activo en el último mes). Por tanto, los factores nombrados en el párrafo anterior son igualmente lo más relevantes para que una wiki sea visitada.
+
+Por último, como hemos podido observar en el caso de la correlación entre visitas a las wikis y número de usuarios activos, quiero resaltar la importancia de que los datos estén limpios, claros, actualizados y sincronizados en la misma fecha, porque de otra manera los análisis, visualizaciones y conclusiones que hagamos pueden ser engañosas o poco fiables.
+
+A pesar de lo anterior, hemos confirmado que para nuestras conclusiones no nos afecta demasiado estos casos extremos puesto que para la gran mayoría de instancias de wikis nuestro dataset la situación es bastante estable y p
+
+# Salvado de nuevos datos
+Finalmente, vamos a producir un fichero con los datos ya limpios, transformados e integrados, y con los nuevos campos que hemos añadido para el análisis: 
 ```{r}
-write.csv(wikis_all, "output_data/20181019-wikia_census_and_page_views-clean.csv")
+write.csv(wikis_all, "output_data/20190102-wikia_census_and_page_views-clean.csv")
 ```
 
 # Referencias
