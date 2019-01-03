@@ -5,8 +5,8 @@ date: '`r format(Sys.Date(),"%e de %B, %Y")`'
 bibliography: bibliography.bib
 output:
   pdf_document:
-    fig_caption: yes
-    latex_engine: xelatex
+    keep_tex: yes
+    latex_engine: lualatex
     toc: yes
   html_document:
     highlight: default
@@ -149,6 +149,7 @@ Y top 10 wikis con mayor número de páginas visitadas:
 head(wikis_pgv[with(wikis_pgv, order(desc(wikis_pgv$visited_pages))), ], n = 10)
 ```
 
+Disponemos de muchísimos datos y muchísimos campos, primero limpiaremos los datos, los transformaremos cuando sea necesario y los integraremos. Posteriormente, para el análisis tomaremos únicamente los campos que tengan sentido para responder a las preguntas que nos planteamos.
 
 # Limpieza
 
@@ -288,11 +289,11 @@ Respecto a los hubs, según este modelo "todos", aunque los hubs de Movies y Mus
 
 Dicho todo lo anterior, observamos que los cinco atributos más importantes son:
 
-1. Que haya una base de usuarios registrados (users_1)
-2. Que la wiki tenga pocas páginas (el estimador es negativo, por tanto la relación es inversa)
-3. Que la wiki tenga usuarios asiduos y con experiencia (users_100)
-4. Que la wiki tenga pocos administradores (stats.admins, negativo)
-5. Que la wiki tenga páginas de contenido
+1. users_1: El número de usuarios o editores de la wiki con al menos una edición es un estimador positivo.
+2. users_100: El número de usuarios o editores de la wiki con al menos cien ediciones es un estimador positivo.
+3. stats.pages: El número de páginas de la wiki es un estimador negativo.
+4. stats.admins: El número de usuarios administradores es un estimador positivo.
+5. stats.articles: El número de páginas de la wiki es un estimador positivo.
 
 ## Modelo de predicción para wikis visitadas
 
@@ -355,30 +356,38 @@ print(xtable(out, caption = "Atributos relevantes para que una wiki esté activa
 
 ```
 
+Como podemos comprobar, los resultados no han sido alterados al quitar los casos extremos. Posiblemente la tendencia sea muy predominante y tales wikis, muy populares y populares como hemos visto, compartan los mismos rasgos que hacen que la wiki esté activa.
 
-Mostramos cómo son las correlacciones que hemos realizado en el paso anterior:
-```{r}
-opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
-plot(regmodel.1, las = 1)      # Residuals, Fitted, ...
-par(opar)
-```
+<!-- # Visualización (2) -->
+<!-- Mostramos cómo son las correlacciones que hemos realizado en el paso anterior: -->
+<!-- ```{r} -->
+<!-- opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0)) -->
+<!-- plot(regmodel.1, las = 1)      # Residuals, Fitted, ... -->
+<!-- par(opar) -->
+<!-- ``` -->
 
-```{r}
-opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
-plot(regmodel.2, las = 1)      # Residuals, Fitted, ...
-par(opar)
-```
+<!-- ```{r} -->
+<!-- opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0)) -->
+<!-- plot(regmodel.2, las = 1)      # Residuals, Fitted, ... -->
+<!-- par(opar) -->
+<!-- ``` -->
 
 # Conclusiones
 Las wikis son un ecosistema de colaboración afianzado donde podemos estudiar fenómenos sociales de trabajo colaborativo interesantes. Además, disponemos de un dataset muy grande y variado de wikis con una gran cantidad de datos sobre el que podemos hacer un análisis extensivo y sacar conclusiones robustas.
 
-Una de las características que podemos estudiar es qué factores son determinantes para que una comunidad online se mantenga activa, esto significa en el caso de las wikis, que haya usuarios activos editando la wiki. En nuestros análisis hemos descubierto que, para lograr dicho objetivo, los factores más relevantes son: 1) .....
+Una de las características que podemos estudiar es qué factores son determinantes para que una comunidad online se mantenga activa, esto significa en el caso de las wikis, que haya usuarios activos editando la wiki. En nuestros análisis hemos descubierto que, para lograr dicho objetivo, los factores más relevantes son:
+
+1. Que haya una base de usuarios registrados (users_1)
+2. Que la wiki tenga usuarios asiduos y con experiencia (users_100)
+3. Que la wiki tenga pocas páginas (stats.pages). El estimador es negativo, por tanto la relación es inversa.
+4. Que la wiki tenga muchos administradores (stats.admins)
+5. Que la wiki tenga páginas de contenido (stats.articles)
 
 Además, también hemos corrobado que las visitas a una wiki (un indicador del interés o utilidad que tiene un recurso en internet) está correlacionada con el hecho de que tengan actividad (al menos un usuario activo en el último mes). Por tanto, los factores nombrados en el párrafo anterior son igualmente lo más relevantes para que una wiki sea visitada.
 
-Por último, como hemos podido observar en el caso de la correlación entre visitas a las wikis y número de usuarios activos, quiero resaltar la importancia de que los datos estén limpios, claros, actualizados y sincronizados en la misma fecha, porque de otra manera los análisis, visualizaciones y conclusiones que hagamos pueden ser engañosas o poco fiables.
+Por último, como hemos podido observar en el caso de la correlación entre visitas a las wikis y número de usuarios activos, quiero resaltar la importancia de que los datos estén actualizados y sincronizados en la misma fecha, porque de otra manera los análisis, visualizaciones y conclusiones que hagamos pueden ser engañosas o poco fiables.
 
-A pesar de lo anterior, hemos confirmado que para nuestras conclusiones no nos afecta demasiado estos casos extremos puesto que para la gran mayoría de instancias de wikis nuestro dataset la situación es bastante estable y p
+A pesar de lo anterior, hemos confirmado que para nuestras conclusiones no nos afecta demasiado estos casos extremos "desincronizados", puesto que para la inmensa mayoría de instancias de wikis en nuestro dataset la situación es bastante estable. Con esto quiero decir que las wikis "exitosas" (activas y con interés), que han conseguido reunir un equilibrio armonioso entre los factores nombrados anteriormente, lo son por varios meses seguidos; y, del mismo modo, las wikis abandonadas o sin interés llevan tiempo en la misma situación y el declive suele ser de forma paulatina.
 
 # Salvado de nuevos datos
 Finalmente, vamos a producir un fichero con los datos ya limpios, transformados e integrados, y con los nuevos campos que hemos añadido para el análisis: 
